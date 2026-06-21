@@ -9,11 +9,25 @@ import {
   totalRevenue,
   totalUnits,
 } from '../lib/data'
+import {
+  COGS_NOTE,
+  TARGET_NOTE,
+  avgPricePerLb,
+  currentMonthPace,
+  gpByProduct,
+  grossMarginPct,
+  grossProfit,
+  monthlyRevenue,
+} from '../lib/margin'
 import { scoreInquiry } from '../lib/scoring'
 import { formatCurrency, formatDate, formatLbs, formatNumber } from '../lib/format'
 import { KpiCard, Pill, SectionCard } from '../components/ui'
+import { InfoTip } from '../components/InfoTip'
 import { RevenueTrendChart } from '../components/charts/RevenueTrendChart'
 import { RankedBarChart } from '../components/charts/RankedBarChart'
+import { MonthlyTargetChart } from '../components/charts/MonthlyTargetChart'
+import { GpByProduct } from '../components/GpByProduct'
+import { ForecastTracker } from '../components/ForecastTracker'
 import { TierBadge } from '../components/TierBadge'
 import { IconChevron, IconFlame, IconInbox } from '../components/icons'
 
@@ -24,6 +38,14 @@ export default function Dashboard({ goToTriage }: { goToTriage: () => void }) {
   const byRegion = revenueByRegion()
   const byProduct = revenueByProduct()
   const weekly = revenueByWeek()
+
+  // Profitability layer (assumptions — see tooltips / margin.ts).
+  const gp = grossProfit()
+  const gpPct = grossMarginPct()
+  const avgLb = avgPricePerLb()
+  const monthly = monthlyRevenue()
+  const gpProd = gpByProduct()
+  const pace = currentMonthPace()
 
   const newInquiries = inquiries.filter((i) => i.status === 'new')
   const openInquiries = inquiries.filter((i) => i.status !== 'closed')
@@ -61,13 +83,18 @@ export default function Dashboard({ goToTriage }: { goToTriage: () => void }) {
       </div>
 
       {/* KPI row */}
-      <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
+      <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-3">
+        <KpiCard label="Revenue (90d)" value={formatCurrency(revenue)} delta={delta.pct} sub="vs prior 30d" />
         <KpiCard
-          label="Revenue (90d)"
-          value={formatCurrency(revenue)}
-          delta={delta.pct}
-          sub="vs prior 30d"
+          label="Gross profit (90d)"
+          value={formatCurrency(gp)}
+          sub={
+            <>
+              {gpPct.toFixed(1)}% GP margin <InfoTip text={COGS_NOTE} label="How gross profit is calculated" />
+            </>
+          }
         />
+        <KpiCard label="Avg price" value={`$${avgLb.toFixed(2)}`} sub="per lb realized" />
         <KpiCard label="Coffee shipped" value={formatLbs(units)} sub="last 90 days" />
         <KpiCard
           label="New inquiries"
@@ -82,7 +109,26 @@ export default function Dashboard({ goToTriage }: { goToTriage: () => void }) {
         />
       </div>
 
-      {/* Trend */}
+      {/* Monthly revenue vs target — full-width row */}
+      <div className="mb-6">
+        <SectionCard
+          title="Monthly revenue vs target"
+          action={<InfoTip text={TARGET_NOTE} label="About the target" align="right" />}
+        >
+          {monthly.length ? (
+            <>
+              <MonthlyTargetChart data={monthly} />
+              <p className="mt-2 text-[11px] text-ink-soft">
+                {monthly[0].label} and {monthly[monthly.length - 1].label} are partial months (start and end of the data window).
+              </p>
+            </>
+          ) : (
+            <p className="text-sm text-ink-soft">No sales yet.</p>
+          )}
+        </SectionCard>
+      </div>
+
+      {/* Weekly trend */}
       <div className="mb-6">
         <SectionCard title="Weekly revenue" subtitle="Wholesale revenue by week, last ~13 weeks">
           {weekly.length ? <RevenueTrendChart data={weekly} /> : <p className="text-sm text-ink-soft">No sales yet.</p>}
@@ -96,6 +142,19 @@ export default function Dashboard({ goToTriage }: { goToTriage: () => void }) {
         </SectionCard>
         <SectionCard title="Revenue by product" subtitle="Top performing roasts">
           <RankedBarChart data={byProduct} color="var(--color-crema)" />
+        </SectionCard>
+      </div>
+
+      {/* GP% by product + forecast tracker */}
+      <div className="mb-6 grid gap-4 lg:grid-cols-2">
+        <SectionCard title="Gross profit % by product" action={<InfoTip text={COGS_NOTE} label="How GP% is calculated" align="right" />}>
+          <GpByProduct data={gpProd} />
+        </SectionCard>
+        <SectionCard
+          title={`${pace.monthLabel} forecast tracker`}
+          action={<InfoTip text={TARGET_NOTE} label="About the forecast" align="right" />}
+        >
+          <ForecastTracker pace={pace} />
         </SectionCard>
       </div>
 

@@ -52,7 +52,7 @@ export function KpiCard({
 }: {
   label: string
   value: string
-  sub?: string
+  sub?: ReactNode
   delta?: number | null
   accent?: ReactNode
 }) {
