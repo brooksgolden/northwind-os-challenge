@@ -1,62 +1,23 @@
 # NOTES
 
-## What I prioritized, and what I cut
+## What I built
+Core: a **dashboard** + an **inquiry-triage workflow**, plus one AI bonus. Then, working from the client's real (Google Sheets) accounting dashboard, I extended the revenue section with a **gross-profit / margin layer**.
 
-I optimized for the rubric: **shipping speed and quality together** — does it run first try, sensible
-empty states, nothing broken, good judgment.
+## What I prioritized and cut, and why
+I optimized for the rubric: shipping speed and quality together — runs first try, sensible empty states, nothing broken, sound judgment.
+- **Kept tight, polished core** over breadth.
+- **One bonus, chosen deliberately — the AI "draft a reply."** I picked it over filtering/search and an inquiry detail page because it's the only bonus that shows *how I work with AI*, which the brief explicitly asks to see. (Lightweight search/filter/sort was nearly free, so triage has it anyway.)
+- **Cut:** auth, a real database, tests, deployment, and a detail page. The brief says don't gold-plate, and each adds "doesn't-run-first-try" risk without proving anything new. Triage state persists to `localStorage`; the mock data stays read-only.
+- **Deferred on purpose (data gaps), not faked:** a New-vs-Returning revenue split and a GP-by-rep leaderboard. Both are central to how the client reads their numbers, but the mock sales rows carry no customer id or rep — so I flagged them instead of inventing data.
 
-**Shipped (and polished):** the two core pieces, plus one bonus.
-- Dashboard that tells a story (insight line + KPIs with a real trend delta, not just numbers).
-- A triage workflow where the *prioritization is the product*: a transparent, explainable score, not
-  a flat list.
-- One bonus, done well: an AI "draft a reply" that actually calls a model. I picked this bonus over
-  filtering/detail pages because it's the only one that demonstrates *how I work with AI*, which the
-  brief explicitly asks to see. (I added lightweight search/filter/sort anyway — it was nearly free
-  and a triage list is unusable without it.)
+## Triage prioritization rule
+Score 0–100 → **Hot ≥70 / Warm ≥45 / Cold**, a transparent weighted blend: **Volume 40%** (revenue proxy), **Channel 25%** (referrals/trade-show convert; cold inbound/instagram don't), **Recency 20%** (intent decays), **Status 15%**. Every card expands to show the four contributions, so an operator trusts it; marking a lead contacted lowers its status weight so it drops down the queue; a closed lead can never be hot.
 
-**Deliberately cut:** auth, a real backend/DB, tests, an inquiry detail page, and deployment. The
-brief says not to gold-plate, and each of those adds surface area (and "doesn't run first try" risk)
-without proving anything new. State persists to `localStorage`; the mock data stays read-only.
-
-## The triage prioritization rule
-
-A lead's score (0–100 → **Hot ≥70 / Warm ≥45 / Cold**) is a weighted blend of the four signals an
-operator would actually weigh by hand:
-
-| Signal | Weight | Why |
-|---|---|---|
-| **Volume** (lbs/mo) | 40% | Direct proxy for revenue. The single biggest reason to call one lead before another. |
-| **Channel** | 25% | Intent varies a lot by source: referral/trade-show convert; cold inbound/instagram are colder. |
-| **Recency** | 20% | Lead intent decays. A fresh request beats a 3-week-old one at the same size. |
-| **Status** | 15% | `qualified` is vetted, `new` needs first touch, `contacted` is mid-flight, `closed` is done. |
-
-Two deliberate choices: it's **transparent** (every card expands to show the four contributions, so an
-operator trusts it instead of obeying a black box), and it's **live** — marking a lead `contacted`
-lowers its status weight, so it naturally falls down the queue once it's handled. `closed` leads can
-never be Hot. "Today" is anchored to the latest date in the dataset so recency stays meaningful.
+## The gross-profit layer (how we extended it, and the logic)
+The client manages to **Gross Profit, not revenue** (GP and GP% are the spine of their sheet; reps even have GP quotas), so I put GP on the dashboard. The source data has revenue only, so `lib/margin.ts` adds a **cost-per-lb per product** — single origin and decaf cost more, cold-brew blend less — which lands a **~45% blended gross margin**, the midpoint of the 40–60% range typical for specialty wholesale roasting. From that one assumption it derives: **GP$ and GP% KPIs, GP% by product, a monthly revenue-vs-target chart, and a current-month forecast/pace tracker** (mirroring their weekly forecast view). The COGS figures and the $160k/$185k targets are **illustrative assumptions, not source data** — stated plainly in the hover tooltips on each (i) — and are one edit away from real numbers. The whole layer sits behind pure selectors, which is exactly the pattern for wiring in real data later.
 
 ## How I'd extend this to production
+Mostly swaps, because the seams are already there: drop real COGS and targets into `lib/margin.ts` (no UI change); replace the `localStorage` triage overlay with a small API + Postgres (already isolated behind one hook); flip the AI reply from the Claude-subscription provider to the Anthropic API (`DRAFT_PROVIDER=api`); and, once orders carry a customer id and owning rep, add the deferred New-vs-Returning split and GP-by-rep leaderboard. Then calibrate the triage weights against real win/loss data.
 
-- **Real persistence + multi-user:** swap the `localStorage` overlay for a small API + Postgres; the
-  data layer is already isolated behind selectors, so this is a contained change.
-- **Calibrate the score with outcomes:** the weights are sensible defaults. With real win/loss data
-  I'd fit them (logistic regression) and A/B the thresholds instead of hard-coding 70/45.
-- **AI reply → API provider:** flip `DRAFT_PROVIDER=api` (already wired) so it doesn't depend on a
-  local CLI; add streaming, a per-rep tone/voice profile, and log edits to improve the prompt.
-- **Hardening:** loading/error/empty states for live data, optimistic updates, e2e tests on the triage
-  actions, and auth/roles.
-
-## How I built it
-
-- **Stack:** Vite + React + TS + Tailwind + Recharts — chosen because the closest sibling project in
-  this ecosystem (a "Northwind Coffee" Claude Code workshop) used exactly this, and Vite is the
-  lowest-risk way to guarantee a one-command, first-try run.
-- **AI, in two ways.** (1) *Building it:* I drove the whole build with Claude Code — research, scaffold,
-  components, and verification — working in parallel where steps were independent (dependency install
-  ran in the background while I wrote the data layer and scoring; typecheck + a headless DOM pass
-  verified rendering and the persisted actions without me clicking by hand). (2) *In the product:* the
-  draft-reply feature calls Claude through my subscription via the Claude Code CLI today, with a
-  one-line switch to the Anthropic API for production and a template fallback so it never hard-fails.
-- **Judgment up front:** before writing code I profiled the data and researched what a strong
-  submission looks like, so the dashboard answers real questions and the triage rule is defensible
-  rather than arbitrary.
+## How I built it — tools, and why
+**Vite + React + TypeScript + Tailwind + Recharts.** The deciding factor was that it has to **run first try, every time**: Vite is the lowest-risk way to guarantee a single-command launch, and it matches the stack of the closest project in this ecosystem. I drove the whole build with **Claude Code** — research, scaffolding, components, verification — running work **in parallel** where steps were independent (e.g. installing dependencies in the background while writing the data layer; using typecheck plus a headless DOM pass to verify rendering and the persisted triage actions instead of clicking by hand). The AI "draft a reply" uses a **pluggable provider**: Claude via my subscription (CLI) now, the Anthropic API for production, and a deterministic template fallback so it never hard-fails for someone cloning it cold.

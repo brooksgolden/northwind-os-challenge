@@ -29,7 +29,7 @@ import { MonthlyTargetChart } from '../components/charts/MonthlyTargetChart'
 import { GpByProduct } from '../components/GpByProduct'
 import { ForecastTracker } from '../components/ForecastTracker'
 import { TierBadge } from '../components/TierBadge'
-import { IconChevron, IconFlame, IconInbox } from '../components/icons'
+import { IconChevron, IconInbox } from '../components/icons'
 
 export default function Dashboard({ goToTriage }: { goToTriage: () => void }) {
   const revenue = totalRevenue()
@@ -53,13 +53,10 @@ export default function Dashboard({ goToTriage }: { goToTriage: () => void }) {
   const activeAccounts = accounts.filter((a) => a.status === 'active')
   const pausedAccounts = accounts.filter((a) => a.status === 'paused')
 
-  const topRegion = byRegion[0]
   const topToAction = [...openInquiries]
     .map((i) => ({ inq: i, s: scoreInquiry(i) }))
     .sort((a, b) => b.s.score - a.s.score)
     .slice(0, 5)
-
-  const trendWord = delta.pct == null ? 'steady' : delta.pct >= 0 ? 'up' : 'down'
 
   return (
     <div className="mx-auto max-w-6xl px-6 py-6">
@@ -71,15 +68,14 @@ export default function Dashboard({ goToTriage }: { goToTriage: () => void }) {
         <Pill>Data through {formatDate(ANCHOR_DATE)}</Pill>
       </header>
 
-      {/* Auto-generated insight line — the "story" up top */}
-      <div className="card mb-6 flex items-start gap-3 border-l-4 border-l-bean p-4">
-        <IconFlame className="mt-0.5 shrink-0 text-bean" />
-        <p className="text-sm text-ink">
-          <strong>{topRegion?.name}</strong> leads revenue at {formatCurrency(topRegion?.revenue ?? 0)} over the last 90 days.
-          Revenue is <strong>{trendWord}{delta.pct != null ? ` ${Math.abs(delta.pct).toFixed(0)}%` : ''}</strong> in the
-          last 30 days vs the prior 30. <strong>{newInquiries.length}</strong> new inquiries are waiting
-          {hotCount > 0 ? <>, <strong>{hotCount}</strong> of them hot.</> : '.'}
-        </p>
+      {/* Current-month GP pacing — top scoreboard */}
+      <div className="mb-6">
+        <SectionCard
+          title={`${pace.monthLabel} forecast tracker`}
+          action={<InfoTip text={TARGET_NOTE} label="About the forecast" align="right" />}
+        >
+          <ForecastTracker pace={pace} layout="banner" />
+        </SectionCard>
       </div>
 
       {/* KPI row */}
@@ -145,16 +141,10 @@ export default function Dashboard({ goToTriage }: { goToTriage: () => void }) {
         </SectionCard>
       </div>
 
-      {/* GP% by product + forecast tracker */}
-      <div className="mb-6 grid gap-4 lg:grid-cols-2">
+      {/* GP% by product */}
+      <div className="mb-6">
         <SectionCard title="Gross profit % by product" action={<InfoTip text={COGS_NOTE} label="How GP% is calculated" align="right" />}>
           <GpByProduct data={gpProd} />
-        </SectionCard>
-        <SectionCard
-          title={`${pace.monthLabel} forecast tracker`}
-          action={<InfoTip text={TARGET_NOTE} label="About the forecast" align="right" />}
-        >
-          <ForecastTracker pace={pace} />
         </SectionCard>
       </div>
 
